@@ -25,6 +25,15 @@ locals {
       for file in local.fruit_set : "${animal}-${element(split("/", dirname(file)), -1)}" => toset(yamldecode(file(file)).colors)
     }
   ]...)
+
+  fruit_queues = merge([
+    for k, v in local.fruit_map : {
+      for color in v :  "${k}-${color}" => {
+        animalfruit = k
+        color = color
+      }
+    }
+  ]...)
 }
 
 module "fruit" {
@@ -32,4 +41,13 @@ module "fruit" {
   source   = "${path.module}/modules/fruit"
   fruit    = each.key
   colors   = each.value
+}
+
+data "aws_region" "current" {}
+data "aws_caller_identity" "current" {}
+
+import {
+  for_each = local.fruit_queues
+  to = module.fruit[each.value.animalfruit].aws_sqs_queue.fruitcolor[each.value.color]
+  id = "https://sqs.${data.aws_region.current.region}.amazonaws.com/${data.aws_caller_identity.current.account_id}/${each.key}"
 }
